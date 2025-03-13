@@ -1,7 +1,3 @@
-Aquí tienes el **README.md** final, más detallado y con el nuevo ejemplo para la creación de oportunidades. Se han omitido comentarios muy internos, manteniendo el enfoque claro y conciso:
-
----
-
 # API SolarMagick
 
 La **API SolarMagick** integra **Magick** y **Landbot** con **Salesforce** para:
@@ -249,7 +245,3 @@ Modifica las URLs de Salesforce (`SF_INSTANCE_URL`, etc.) en `.env` y usa creden
 
 **¿Cómo agrego validaciones de campos?**  
 Puedes usar [express-validator](https://www.npmjs.com/package/express-validator) o Joi para validar el body antes de llamar a Salesforce.
-
----
-
-¡Listo! Con estos pasos, tu equipo podrá entender y usar la **API SolarMagick** de manera segura y clara.
