@@ -87,10 +87,10 @@ async function checkDuplicates(docParaDuplicados) {
   if (scenario === 'Opportunity_open') {
     const responseObj = {
       success: false,
-      WPI_composer_type_sf: scenario,
+      MAI_composer_type_sf: scenario,
       message: 'Ya existe un cliente con oportunidad abierta. No se puede crear.',
       sf_raw: dupData,
-      WPI_accountid_callback_sf: accountIdCallback
+      MAI_accountid_callback_sf: accountIdCallback
     };
     // Log
     duplicatesLogService.saveDuplicatesLog(responseObj);
@@ -101,8 +101,8 @@ async function checkDuplicates(docParaDuplicados) {
   const responseObj = {
     success: true,
     message: 'OK. No hay oportunidad abierta, puedes continuar.',
-    WPI_composer_type_sf: scenario,
-    WPI_accountid_callback_sf: accountIdCallback,
+    MAI_composer_type_sf: scenario,
+    MAI_accountid_callback_sf: accountIdCallback,
     sf_raw: dupData
   };
   duplicatesLogService.saveDuplicatesLog(responseObj);
