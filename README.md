@@ -201,14 +201,160 @@ El proyecto utiliza `express-rate-limit`. La variable `MAX_REQUESTS_PER_MIN` def
 }
 ```
 
-## 7. Despliegue
+## 7. Despliegue - EC2 con Docker
 
-1. **Variables de entorno**: Ajusta tus credenciales de Salesforce y API Keys en `.env`.
-2. **HTTPS**: Para entorno productivo, se recomienda usar un balanceador o servidor con certificado SSL.
-3. **PM2 u otro**: Si deseas un gestor de procesos, puedes usar [PM2](https://pm2.keymetrics.io/):
+## A) Preparativos Generales
+
+1. **Creación o uso de Instancia EC2**  
+   - Crea una instancia EC2 (por ejemplo, Amazon Linux 2) desde la consola de AWS.  
+   - Asegúrate de habilitar **acceso a internet** (asocia un Security Group con tráfico de salida permitido y un **IP público** o un **Elastic IP** si deseas).  
+   - Inicia sesión por SSH (usualmente con `ssh -i <miKey.pem> ec2-user@<PublicIP>`).
+
+2. **Instalar Docker en EC2**  
+   Si usas Amazon Linux 2:
    ```bash
-   pm2 start index.js --name "solar-magick-api"
+   sudo yum update -y
+   sudo amazon-linux-extras install docker -y
+   sudo service docker start
+   sudo usermod -aG docker ec2-user
    ```
+   Tras esto, **cierra** tu sesión SSH y vuelve a entrar para que surtan efecto los cambios de grupo.
+
+3. **Crear un archivo .env**  
+   Ya sea que vayas a usar Docker pull o a build localmente, necesitas tu archivo **.env** con tus credenciales de Salesforce y tus API Keys. Por ejemplo:
+   ```bash
+   mkdir /home/ec2-user/solar-magick
+   cd /home/ec2-user/solar-magick
+   vim .env
+   ```
+   Pega tus variables de entorno (no subas esto a GitHub). Ajusta permisos si quieres protegerlo (`chmod 600 .env`).
+
+4. **Configurar el Security Group**  
+   - Abre el puerto necesario para tu API (por ejemplo **3000**).  
+   - Si usarás HTTPS con un proxy Nginx, entonces abres el **443** y rediriges interno a 3000.  
+   - Asegúrate de limitar el tráfico a las IPs necesarias o a todo el mundo según tu caso.
+
+---
+
+## B) Método 1 (Recomendado): Usar Imagen desde un Registro
+
+### 1. Tener la imagen en un registro (Docker Hub o Amazon ECR)
+
+- **Docker Hub**:  
+  - Inicia sesión localmente (`docker login`)  
+  - Cambia la etiqueta: `docker tag solar-magick:1.0.0 tuusuario/solar-magick:1.0.0`  
+  - Sube: `docker push tuusuario/solar-magick:1.0.0`  
+
+- **Amazon ECR**:  
+  - Crea un repositorio en ECR.  
+  - Inicia sesión en ECR con `aws ecr get-login-password ...`  
+  - Etiqueta y haz `docker push <aws_account_id>.dkr.ecr.<region>.amazonaws.com/solar-magick:1.0.0`.  
+
+### 2. En EC2, `docker pull` de la imagen
+
+En tu instancia EC2:
+
+```bash
+docker pull tuusuario/solar-magick:1.0.0
+```
+
+o desde ECR:
+
+```bash
+docker pull <aws_account_id>.dkr.ecr.<region>.amazonaws.com/solar-magick:1.0.0
+```
+
+### 3. Ejecutar contenedor con el .env
+
+```bash
+docker run -d -p 3000:3000   --env-file /home/ec2-user/solar-magick/.env   --name solar-api   tuusuario/solar-magick:1.0.0
+```
+
+### 4. Verificar
+
+- Revisa logs: `docker logs -f solar-api`  
+- Visita: `http://<PublicIP>:3000/api/salesforce/duplicates` (o el dominio asociado).  
+- Envía la cabecera `x-api-key` con tu clave.  
+- Observa la respuesta en la terminal de logs o en Postman.
+
+---
+
+## C) Método 2 (Menos Práctico): Copiar Código y Build Local en EC2
+
+### 1. Copiar el repositorio
+
+Puedes:
+
+- **Clonar** directamente desde GitHub (si tu EC2 puede acceder a tu repo privado).  
+  ```bash
+  sudo yum install git -y
+  cd /home/ec2-user
+  git clone <url-de-tu-repo.git> solar-magick
+  cd solar-magick
+  ```
+
+- **Subir un zip** con scp:
+  ```bash
+  scp -i <miKey.pem> solar-magick.zip ec2-user@<PublicIP>:/home/ec2-user
+  ssh -i <miKey.pem> ec2-user@<PublicIP>
+  unzip solar-magick.zip -d solar-magick
+  cd solar-magick
+  ```
+
+### 2. Instalar Docker (si no lo has hecho)
+
+```bash
+sudo yum update -y
+sudo amazon-linux-extras install docker -y
+sudo service docker start
+sudo usermod -aG docker ec2-user
+```
+Salir/entrar de SSH.
+
+### 3. Crear Dockerfile (si no existe)
+
+En `/home/ec2-user/solar-magick`:
+```bash
+vim Dockerfile
+```
+Agrega:
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["node", "index.js"]
+```
+
+### 4. Build la imagen en la instancia
+
+```bash
+docker build -t solar-magick:1.0.0 .
+```
+
+### 5. Ejecutar contenedor
+
+```bash
+docker run -d -p 3000:3000   --env-file /home/ec2-user/solar-magick/.env   --name solar-api   solar-magick:1.0.0
+```
+
+### 6. Verificar
+
+- `docker ps` para ver contenedores corriendo.  
+- Abrir `http://<PublicIP>:3000/api/salesforce/duplicates`.  
+- Usar la API key en `x-api-key`.
+
+---
+
+## D) Paso Final: Configurar HTTPS (Opcional)
+
+1. **Opción A**: Instalar Nginx en EC2 y usar un proxy inverso con SSL (puerto 443). Rediriges el tráfico de `https://` al contenedor interno en `localhost:3000`.  
+2. **Opción B**: Usar un **Application Load Balancer** (ALB) con un Certificado en AWS Certificate Manager, que envía el tráfico al puerto 3000 de la instancia.  
+3. **Opción C**: Emplear un servicio de containers como ECS/Fargate, con un LB delante, y delegar SSL en el LB.  
+
 
 ## 8. Uso en Postman
 
