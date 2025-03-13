@@ -12,10 +12,6 @@ if (!fs.existsSync(LOGS_DIR)) {
 
 const LOG_FILE = path.join(LOGS_DIR, 'duplicates.log');
 
-/**
- * saveDuplicatesLog
- * @param {object} info - El objeto de respuesta a loguear
- */
 function saveDuplicatesLog(info) {
   const timestamp = new Date().toISOString();
   const logEntry = {

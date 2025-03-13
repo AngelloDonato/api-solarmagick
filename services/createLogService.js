@@ -12,9 +12,6 @@ if (!fs.existsSync(LOGS_DIR)) {
 
 const LOG_FILE = path.join(LOGS_DIR, 'createOpportunity.log');
 
-/**
- * Guarda la respuesta en createOpportunity.log
- */
 function saveCreateLog(info) {
   const timestamp = new Date().toISOString();
   const logEntry = {
